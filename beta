@@ -1,0 +1,218 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Rarity colors
+local rarityColors = {
+	["Common"] = Color3.fromRGB(0, 171, 40),
+	["Rare"] = Color3.fromRGB(0, 131, 171),
+	["Epic"] = Color3.fromRGB(170, 0, 255),
+	["Legendary"] = Color3.fromRGB(255, 165, 0),
+	["Secret"] = Color3.fromRGB(255, 0, 0),
+	["OG"] = Color3.fromRGB(255, 195, 0),
+	["Brainrot God"] = Color3.fromRGB(255, 50, 50),
+}
+
+-- Get all brainrots via AnimalOverhead
+local function getBrainrots()
+	local list = {}
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj.Name == "AnimalOverhead" then
+			local nameLabel = obj:FindFirstChild("DisplayName")
+			local priceLabel = obj:FindFirstChild("Price")
+			local rarityLabel = obj:FindFirstChild("Rarity")
+
+			if nameLabel and nameLabel.Text ~= "" then
+				table.insert(list, {
+					name = nameLabel.Text,
+					overhead = obj,
+					nameLabel = nameLabel,
+					priceLabel = priceLabel,
+					rarityLabel = rarityLabel,
+				})
+			end
+		end
+	end
+	return list
+end
+
+-- GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "OverheadEditor"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer.PlayerGui
+
+local main = Instance.new("Frame", screenGui)
+main.Size = UDim2.new(0, 220, 0, 220)
+main.Position = UDim2.new(1, -230, 0.5, -110)
+main.BackgroundColor3 = Color3.fromRGB(28, 28, 40)
+main.Active = true
+main.Draggable = true
+main.Visible = false
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 8)
+
+-- Title
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "Overhead Editor [J]"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 13
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- Dropdown button
+local dropBtn = Instance.new("TextButton", main)
+dropBtn.Size = UDim2.new(0.9, 0, 0, 28)
+dropBtn.Position = UDim2.new(0.05, 0, 0, 34)
+dropBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
+dropBtn.Text = "Select Brainrot ▼"
+dropBtn.Font = Enum.Font.Gotham
+dropBtn.TextSize = 11
+dropBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", dropBtn).CornerRadius = UDim.new(0, 6)
+
+-- Scrollable dropdown
+local dropScroll = Instance.new("ScrollingFrame", main)
+dropScroll.Size = UDim2.new(0.9, 0, 0, 0)
+dropScroll.Position = UDim2.new(0.05, 0, 0, 64)
+dropScroll.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+dropScroll.BorderSizePixel = 0
+dropScroll.ScrollBarThickness = 3
+dropScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 120, 255)
+dropScroll.ClipsDescendants = true
+dropScroll.Visible = false
+dropScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+Instance.new("UICorner", dropScroll).CornerRadius = UDim.new(0, 6)
+Instance.new("UIListLayout", dropScroll).SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Rarity box
+local rarityBox = Instance.new("TextBox", main)
+rarityBox.Size = UDim2.new(0.9, 0, 0, 28)
+rarityBox.Position = UDim2.new(0.05, 0, 0, 122)
+rarityBox.PlaceholderText = "Rarity..."
+rarityBox.Text = ""
+rarityBox.Font = Enum.Font.Gotham
+rarityBox.TextSize = 11
+rarityBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+rarityBox.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
+Instance.new("UICorner", rarityBox).CornerRadius = UDim.new(0, 6)
+
+-- Price box
+local priceBox = Instance.new("TextBox", main)
+priceBox.Size = UDim2.new(0.9, 0, 0, 28)
+priceBox.Position = UDim2.new(0.05, 0, 0, 156)
+priceBox.PlaceholderText = "Price..."
+priceBox.Text = ""
+priceBox.Font = Enum.Font.Gotham
+priceBox.TextSize = 11
+priceBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+priceBox.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
+Instance.new("UICorner", priceBox).CornerRadius = UDim.new(0, 6)
+
+-- Apply button
+local applyBtn = Instance.new("TextButton", main)
+applyBtn.Size = UDim2.new(0.9, 0, 0, 28)
+applyBtn.Position = UDim2.new(0.05, 0, 0, 188)
+applyBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+applyBtn.Text = "Apply"
+applyBtn.Font = Enum.Font.GothamBold
+applyBtn.TextSize = 12
+applyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", applyBtn).CornerRadius = UDim.new(0, 6)
+
+-- State
+local selectedEntry = nil
+local dropOpen = false
+
+local function closeDropdown()
+	dropOpen = false
+	dropScroll.Visible = false
+	dropScroll.Size = UDim2.new(0.9, 0, 0, 0)
+	rarityBox.Position = UDim2.new(0.05, 0, 0, 122)
+	priceBox.Position = UDim2.new(0.05, 0, 0, 156)
+	applyBtn.Position = UDim2.new(0.05, 0, 0, 188)
+	main.Size = UDim2.new(0, 220, 0, 220)
+end
+
+local function openDropdown()
+	for _, c in ipairs(dropScroll:GetChildren()) do
+		if c:IsA("TextButton") then c:Destroy() end
+	end
+
+	local brainrots = getBrainrots()
+	local rowH = 26
+	local maxVisible = math.min(#brainrots, 4)
+	local dropHeight = maxVisible * rowH
+
+	for _, entry in ipairs(brainrots) do
+		local btn = Instance.new("TextButton", dropScroll)
+		btn.Size = UDim2.new(1, 0, 0, rowH)
+		btn.BackgroundTransparency = 1
+		btn.Text = entry.name
+		btn.Font = Enum.Font.Gotham
+		btn.TextSize = 11
+		btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+
+		btn.MouseButton1Click:Connect(function()
+			selectedEntry = entry
+			dropBtn.Text = entry.name .. " ▼"
+			closeDropdown()
+		end)
+	end
+
+	dropScroll.CanvasSize = UDim2.new(0, 0, 0, #brainrots * rowH)
+	dropScroll.Size = UDim2.new(0.9, 0, 0, dropHeight)
+	dropScroll.Visible = true
+
+	local offset = 64 + dropHeight + 6
+	rarityBox.Position = UDim2.new(0.05, 0, 0, offset)
+	priceBox.Position = UDim2.new(0.05, 0, 0, offset + 34)
+	applyBtn.Position = UDim2.new(0.05, 0, 0, offset + 68)
+	main.Size = UDim2.new(0, 220, 0, offset + 100)
+end
+
+-- Toggle dropdown
+dropBtn.MouseButton1Click:Connect(function()
+	dropOpen = not dropOpen
+	if dropOpen then
+		openDropdown()
+	else
+		closeDropdown()
+	end
+end)
+
+-- Apply
+applyBtn.MouseButton1Click:Connect(function()
+	if not selectedEntry then
+		applyBtn.Text = "Select one!"
+		task.wait(1)
+		applyBtn.Text = "Apply"
+		return
+	end
+
+	if rarityBox.Text ~= "" and selectedEntry.rarityLabel then
+		selectedEntry.rarityLabel.Text = rarityBox.Text
+		local color = rarityColors[rarityBox.Text]
+		if color then
+			selectedEntry.rarityLabel.TextColor3 = color
+		end
+	end
+
+	if priceBox.Text ~= "" and selectedEntry.priceLabel then
+		selectedEntry.priceLabel.Text = priceBox.Text
+	end
+
+	applyBtn.Text = "✅ Done!"
+	applyBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+	task.wait(1.5)
+	applyBtn.Text = "Apply"
+	applyBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+end)
+
+-- J to toggle
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.J then
+		main.Visible = not main.Visible
+	end
+end)
