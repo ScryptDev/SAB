@@ -14,7 +14,7 @@ local panelVisible = false
 local PANEL_W    = 210
 local PANEL_H    = 120
 
-local C_CARD      = Color3.fromRGB(18, 18, 28)
+local C_CARD      = Color3.fromRGB(15, 15, 17)
 local C_WHITE     = Color3.fromRGB(255, 255, 255)
 local C_BTN_DARK  = Color3.fromRGB(55,  65, 160)
 local C_BTN_LIGHT = Color3.fromRGB(88, 101, 242)
@@ -33,7 +33,9 @@ end
 -- owned cache
 local ownedCache = {}
 local function isOwned(itemId)
-	local id = tonumber(itemId)
+	if not itemId or itemId == "" then return false end
+	local digits = tostring(itemId):gsub("[^%d]","")
+	local id = digits ~= "" and tonumber(digits) or nil
 	if not id then return false end
 	if ownedCache[id] ~= nil then return ownedCache[id] end
 	local ok, result = pcall(function()
@@ -47,7 +49,9 @@ end
 -- info cache
 local infoCache = {}
 local function getInfo(itemId)
-	local id = tonumber(itemId)
+	if not itemId or itemId == "" then return nil end
+	local digits = tostring(itemId):gsub("[^%d]","")
+	local id = digits ~= "" and tonumber(digits) or nil
 	if not id then return nil end
 	if infoCache[id] then return infoCache[id] end
 	-- try gamepass first then product
@@ -384,6 +388,12 @@ local function ghostBuyButton(buyObj, itemName, itemPrice, itemImageId, itemId, 
 	if hookedBuys[buyObj] then return end
 	hookedBuys[buyObj] = true
 
+	-- disable real button so it never fires
+	pcall(function()
+		buyObj.Active = false
+		buyObj.AutoButtonColor = false
+	end)
+
 	local ghost = Instance.new("TextButton", buyObj)
 	ghost.Name = "GhostBtn"
 	ghost.Size = UDim2.new(1,0,1,0)
@@ -402,13 +412,20 @@ local function ghostBuyButton(buyObj, itemName, itemPrice, itemImageId, itemId, 
 		local snd = Instance.new("Sound", game:GetService("SoundService"))
 		snd.SoundId = "rbxassetid://75311202481026"; snd.Volume = 1; snd:Play()
 		Debris:AddItem(snd, 5)
-		if isGamepass and isOwned(itemId) then return end
+
 		local giftedTo = getGiftTarget()
+		local gifting = giftedTo and giftedTo ~= ""
+
+		-- if owned and NOT gifting, skip popup entirely
+		if isGamepass and isOwned(itemId) and not gifting then return end
+
 		local finalPrice = itemPrice
 		pcall(function()
 			local priceLbl = buyObj:FindFirstChild("Price")
 			if priceLbl and priceLbl.Text then
-				local p = tonumber((priceLbl.Text:gsub("[^%d]","")))
+				local raw = priceLbl.Text:gsub("<[^>]+>",""):gsub("</[^>]+>","")
+				local digits = raw:gsub("[^%d]","")
+				local p = digits ~= "" and tonumber(digits) or nil
 				if p and p > 0 then finalPrice = tostring(p) end
 			end
 		end)
@@ -424,9 +441,13 @@ end
 -- strip rich text tags and get clean number from price string
 local function cleanPrice(raw)
 	if not raw then return nil end
-	local stripped = raw:gsub("<[^>]+>", ""):gsub("</[^>]+>", "")
-	local n = tonumber(stripped:gsub("[^%d]",""))
-	return n
+	local ok, stripped = pcall(function()
+		return raw:gsub("<[^>]+>", ""):gsub("</[^>]+>", "")
+	end)
+	if not ok then return nil end
+	local digits = stripped:gsub("[^%d]", "")
+	if digits == "" then return nil end
+	return tonumber(digits)
 end
 
 -- scan any GuiObject for Buy buttons and ghost them
