@@ -416,8 +416,8 @@ local function ghostBuyButton(buyObj, itemName, itemPrice, itemImageId, itemId, 
 		local giftedTo = getGiftTarget()
 		local gifting = giftedTo and giftedTo ~= ""
 
-		-- if owned and NOT gifting, skip popup entirely
-		if isGamepass and isOwned(itemId) and not gifting then return end
+		-- only skip if owned AND not gifting
+		if not gifting and isGamepass and isOwned(itemId) then return end
 
 		local finalPrice = itemPrice
 		pcall(function()
